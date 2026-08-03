@@ -26,6 +26,7 @@ export const getCurrentWorkspace = cache(async () => {
     where: { userId },
     orderBy: { createdAt: "asc" },
     select: {
+      id: true,
       role: true,
       workspace: {
         select: {

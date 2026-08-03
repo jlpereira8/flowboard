@@ -4,7 +4,8 @@ import { signOutUser } from "@/app/actions/auth";
 
 type AppShellProps = {
   children: React.ReactNode;
-  activeItem?: "overview" | "projects" | "tasks" | "calendar";
+  activeItem?: "overview" | "projects" | "teams" | "members" | "tasks" | "calendar";
+  action?: { label: string; href: string } | null;
   title?: string;
   user: {
     name?: string | null;
@@ -19,11 +20,14 @@ type AppShellProps = {
 const navigation = [
   { id: "overview", label: "Overview", href: "/dashboard" },
   { id: "projects", label: "Projects", href: "/dashboard/projects" },
+  { id: "teams", label: "Teams", href: "/dashboard/teams" },
+  { id: "members", label: "Members", href: "/dashboard/members" },
   { id: "tasks", label: "My tasks", href: "/dashboard/tasks" },
   { id: "calendar", label: "Calendar", href: "/dashboard/calendar" },
 ] as const;
 
-export function AppShell({ activeItem = "overview", children, title = "Overview", user, workspace }: AppShellProps) {
+export function AppShell({ activeItem = "overview", action, children, title = "Overview", user, workspace }: AppShellProps) {
+  const headerAction = action === undefined ? { label: "New project", href: "/dashboard/projects/new" } : action;
   const initials = (user.name || user.email || "FB")
     .split(/[\s@]/)
     .filter(Boolean)
@@ -80,9 +84,11 @@ export function AppShell({ activeItem = "overview", children, title = "Overview"
             <p className="text-xs text-zinc-400">{workspace.slug}</p>
             <h1 className="text-sm font-semibold">{title}</h1>
           </div>
-          <Link className="rounded-xl bg-zinc-950 px-4 py-2 text-xs font-medium text-white transition hover:bg-zinc-800" href="/dashboard/projects/new">
-            New project
-          </Link>
+          {headerAction ? (
+            <Link className="rounded-xl bg-zinc-950 px-4 py-2 text-xs font-medium text-white transition hover:bg-zinc-800" href={headerAction.href}>
+              {headerAction.label}
+            </Link>
+          ) : null}
         </header>
         {children}
       </div>
