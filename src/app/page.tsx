@@ -29,9 +29,9 @@ export default function Home() {
             FlowBoard brings projects, tasks, and team momentum into one calm workspace.
           </p>
           <div className="mt-9 flex flex-wrap items-center gap-3">
-            <button className="rounded-xl bg-zinc-950 px-5 py-3 text-sm font-medium text-white shadow-sm transition hover:bg-zinc-800">
-              Coming soon
-            </button>
+            <a className="rounded-xl bg-zinc-950 px-5 py-3 text-sm font-medium text-white shadow-sm transition hover:bg-zinc-800" href="/login">
+              Get started
+            </a>
             <a className="rounded-xl border border-zinc-200 bg-white px-5 py-3 text-sm font-medium text-zinc-700 shadow-sm transition hover:border-zinc-300" href="https://github.com/jlpereira8/flowboard">
               View on GitHub
             </a>
