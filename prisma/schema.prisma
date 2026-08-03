@@ -26,18 +26,19 @@ enum ProjectStatus {
 }
 
 model User {
-  id              String      @id @default(cuid())
+  id              String                @id @default(cuid())
   name            String?
-  email           String?     @unique
+  email           String?               @unique
   emailVerified   DateTime?
   image           String?
   accounts        Account[]
   sessions        Session[]
   memberships     Member[]
-  ownedWorkspaces Workspace[] @relation("WorkspaceOwner")
-  createdProjects Project[]   @relation("ProjectCreator")
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
+  ownedWorkspaces Workspace[]           @relation("WorkspaceOwner")
+  createdProjects Project[]             @relation("ProjectCreator")
+  sentInvitations WorkspaceInvitation[] @relation("InvitationSender")
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
 }
 
 model Account {
@@ -78,15 +79,17 @@ model VerificationToken {
 }
 
 model Workspace {
-  id        String   @id @default(cuid())
-  name      String
-  slug      String   @unique
-  ownerId   String
-  owner     User     @relation("WorkspaceOwner", fields: [ownerId], references: [id], onDelete: Cascade)
-  members   Member[]
-  projects  Project[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          String                @id @default(cuid())
+  name        String
+  slug        String                @unique
+  ownerId     String
+  owner       User                  @relation("WorkspaceOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  members     Member[]
+  projects    Project[]
+  teams       Team[]
+  invitations WorkspaceInvitation[]
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
 
   @@index([ownerId])
 }
@@ -100,8 +103,10 @@ model Project {
   status      ProjectStatus @default(ACTIVE)
   workspaceId String
   createdById String
+  teamId      String?
   workspace   Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   createdBy   User          @relation("ProjectCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  team        Team?         @relation(fields: [teamId], references: [id], onDelete: SetNull)
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 
@@ -109,6 +114,7 @@ model Project {
   @@unique([workspaceId, key])
   @@index([workspaceId, status])
   @@index([createdById])
+  @@index([teamId])
 }
 
 model Member {
@@ -118,9 +124,56 @@ model Member {
   workspaceId String
   user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   workspace   Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  teams       TeamMember[]
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 
   @@unique([userId, workspaceId])
   @@index([workspaceId])
+}
+
+model Team {
+  id          String       @id @default(cuid())
+  name        String
+  key         String
+  description String?
+  workspaceId String
+  workspace   Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  members     TeamMember[]
+  projects    Project[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@unique([workspaceId, key])
+  @@index([workspaceId])
+}
+
+model TeamMember {
+  id        String   @id @default(cuid())
+  teamId    String
+  memberId  String
+  team      Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  member    Member   @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([teamId, memberId])
+  @@index([memberId])
+}
+
+model WorkspaceInvitation {
+  id          String        @id @default(cuid())
+  email       String
+  role        WorkspaceRole @default(MEMBER)
+  tokenHash   String        @unique
+  expiresAt   DateTime
+  acceptedAt  DateTime?
+  workspaceId String
+  invitedById String
+  workspace   Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  invitedBy   User          @relation("InvitationSender", fields: [invitedById], references: [id], onDelete: Cascade)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@index([workspaceId, email])
+  @@index([expiresAt])
 }
