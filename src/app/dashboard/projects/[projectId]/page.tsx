@@ -1,0 +1,57 @@
+import Link from "next/link";
+import { notFound, redirect } from "next/navigation";
+
+import { AppShell } from "@/components/layout/app-shell";
+import { getCurrentWorkspace, verifySession } from "@/lib/dal";
+import { prisma } from "@/lib/prisma";
+
+export default async function ProjectPage({ params }: { params: Promise<{ projectId: string }> }) {
+  const [{ projectId }, { user }, membership] = await Promise.all([params, verifySession(), getCurrentWorkspace()]);
+
+  if (!membership) redirect("/onboarding");
+
+  const project = await prisma.project.findFirst({
+    where: { id: projectId, workspaceId: membership.workspace.id },
+  });
+
+  if (!project) notFound();
+
+  return (
+    <AppShell activeItem="projects" title={project.name} user={user} workspace={membership.workspace}>
+      <main className="px-5 py-8 lg:px-8 lg:py-10">
+        <div className="mx-auto max-w-6xl">
+          <Link className="text-xs font-medium text-zinc-400 transition hover:text-zinc-700" href="/dashboard/projects">← Projects</Link>
+          <div className="mt-6 flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
+            <div>
+              <div className="flex items-center gap-3">
+                <span className="rounded-lg bg-zinc-950 px-2.5 py-1 text-xs font-semibold text-white">{project.key}</span>
+                <span className="text-xs capitalize text-zinc-400">{project.status.toLowerCase()}</span>
+              </div>
+              <h2 className="mt-4 text-3xl font-semibold tracking-[-0.035em]">{project.name}</h2>
+              <p className="mt-3 max-w-2xl text-sm leading-6 text-zinc-500">{project.description || "Add a project description to give the team more context."}</p>
+            </div>
+            <button className="rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm font-medium text-zinc-500" disabled>Edit project</button>
+          </div>
+
+          <section className="mt-8 grid gap-4 lg:grid-cols-[1.4fr_0.6fr]">
+            <article className="grid min-h-80 place-items-center rounded-2xl border border-zinc-200 bg-white p-8 text-center shadow-sm">
+              <div className="max-w-sm">
+                <span className="mx-auto grid size-11 place-items-center rounded-xl bg-zinc-100 text-zinc-500">✓</span>
+                <h3 className="mt-5 text-sm font-semibold">Tasks are the next layer</h3>
+                <p className="mt-2 text-xs leading-5 text-zinc-400">The project foundation is ready for the Kanban and task workflow in Phase 3.</p>
+              </div>
+            </article>
+            <article className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
+              <h3 className="text-sm font-semibold">Project details</h3>
+              <dl className="mt-6 space-y-5 text-xs">
+                <div><dt className="text-zinc-400">Status</dt><dd className="mt-1 font-medium capitalize">{project.status.toLowerCase()}</dd></div>
+                <div><dt className="text-zinc-400">Created</dt><dd className="mt-1 font-medium">{project.createdAt.toLocaleDateString("en", { dateStyle: "medium" })}</dd></div>
+                <div><dt className="text-zinc-400">Project key</dt><dd className="mt-1 font-medium">{project.key}</dd></div>
+              </dl>
+            </article>
+          </section>
+        </div>
+      </main>
+    </AppShell>
+  );
+}
