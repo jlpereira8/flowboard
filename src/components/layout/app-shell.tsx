@@ -4,6 +4,8 @@ import { signOutUser } from "@/app/actions/auth";
 
 type AppShellProps = {
   children: React.ReactNode;
+  activeItem?: "overview" | "projects" | "tasks" | "calendar";
+  title?: string;
   user: {
     name?: string | null;
     email?: string | null;
@@ -15,13 +17,13 @@ type AppShellProps = {
 };
 
 const navigation = [
-  { label: "Overview", href: "/dashboard", active: true },
-  { label: "Projects", href: "/dashboard/projects" },
-  { label: "My tasks", href: "/dashboard/tasks" },
-  { label: "Calendar", href: "/dashboard/calendar" },
-];
+  { id: "overview", label: "Overview", href: "/dashboard" },
+  { id: "projects", label: "Projects", href: "/dashboard/projects" },
+  { id: "tasks", label: "My tasks", href: "/dashboard/tasks" },
+  { id: "calendar", label: "Calendar", href: "/dashboard/calendar" },
+] as const;
 
-export function AppShell({ children, user, workspace }: AppShellProps) {
+export function AppShell({ activeItem = "overview", children, title = "Overview", user, workspace }: AppShellProps) {
   const initials = (user.name || user.email || "FB")
     .split(/[\s@]/)
     .filter(Boolean)
@@ -47,7 +49,7 @@ export function AppShell({ children, user, workspace }: AppShellProps) {
         <nav className="space-y-1 px-3 py-2">
           {navigation.map((item) => (
             <Link
-              className={`block rounded-lg px-3 py-2 text-sm transition ${item.active ? "bg-zinc-100 font-medium text-zinc-950" : "text-zinc-500 hover:bg-zinc-50 hover:text-zinc-800"}`}
+              className={`block rounded-lg px-3 py-2 text-sm transition ${activeItem === item.id ? "bg-zinc-100 font-medium text-zinc-950" : "text-zinc-500 hover:bg-zinc-50 hover:text-zinc-800"}`}
               href={item.href}
               key={item.label}
             >
@@ -76,9 +78,11 @@ export function AppShell({ children, user, workspace }: AppShellProps) {
         <header className="flex h-16 items-center justify-between border-b border-zinc-200 bg-white px-5 lg:px-8">
           <div>
             <p className="text-xs text-zinc-400">{workspace.slug}</p>
-            <h1 className="text-sm font-semibold">Overview</h1>
+            <h1 className="text-sm font-semibold">{title}</h1>
           </div>
-          <button className="rounded-xl bg-zinc-950 px-4 py-2 text-xs font-medium text-white">New project</button>
+          <Link className="rounded-xl bg-zinc-950 px-4 py-2 text-xs font-medium text-white transition hover:bg-zinc-800" href="/dashboard/projects/new">
+            New project
+          </Link>
         </header>
         {children}
       </div>
