@@ -72,7 +72,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
             </article>
           </section>
 
-          <KanbanBoard initialTasks={project.tasks} projectId={project.id} projectKey={project.key} />
+          <KanbanBoard initialTasks={project.tasks} key={project.tasks.map((task) => `${task.id}:${task.status}:${task.position}`).join("|")} projectId={project.id} projectKey={project.key} />
         </div>
       </main>
     </AppShell>
