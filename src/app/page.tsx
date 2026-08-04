@@ -10,10 +10,10 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-[#f7f7f5] text-zinc-950">
       <nav className="mx-auto flex max-w-6xl items-center justify-between px-6 py-6 lg:px-8">
-        <a className="flex items-center gap-2.5 font-semibold tracking-tight" href="#">
+        <Link className="flex items-center gap-2.5 font-semibold tracking-tight" href="/">
           <span className="grid size-8 place-items-center rounded-lg bg-zinc-950 text-sm text-white">F</span>
           FlowBoard
-        </a>
+        </Link>
         <span className="rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs font-medium text-zinc-600 shadow-sm">
           Early access
         </span>
@@ -29,9 +29,9 @@ export default function Home() {
             FlowBoard brings projects, tasks, and team momentum into one calm workspace.
           </p>
           <div className="mt-9 flex flex-wrap items-center gap-3">
-            <a className="rounded-xl bg-zinc-950 px-5 py-3 text-sm font-medium text-white shadow-sm transition hover:bg-zinc-800" href="/login">
-              Get started
-            </a>
+            <Link className="rounded-xl bg-zinc-950 px-5 py-3 text-sm font-medium text-white shadow-sm transition hover:bg-zinc-800" href="/login">
+              Open FlowBoard
+            </Link>
             <a className="rounded-xl border border-zinc-200 bg-white px-5 py-3 text-sm font-medium text-zinc-700 shadow-sm transition hover:border-zinc-300" href="https://github.com/jlpereira8/flowboard">
               View on GitHub
             </a>
@@ -84,3 +84,4 @@ export default function Home() {
     </main>
   );
 }
+import Link from "next/link";

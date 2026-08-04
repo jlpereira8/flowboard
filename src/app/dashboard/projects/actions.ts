@@ -19,12 +19,20 @@ const projectSchema = z.object({
   description: z.string().trim().max(240, "Use 240 characters or fewer."),
 });
 
+const projectUpdateSchema = projectSchema.extend({
+  projectId: z.string().min(1),
+  status: z.enum(["PLANNED", "ACTIVE", "PAUSED", "COMPLETED"]),
+  teamId: z.string().optional(),
+});
+
 export type ProjectFormState = {
   error?: string;
   fieldErrors?: {
     name?: string;
     key?: string;
     description?: string;
+    status?: string;
+    teamId?: string;
   };
 };
 
@@ -85,4 +93,60 @@ export async function createProject(_state: ProjectFormState, formData: FormData
   revalidatePath("/dashboard");
   revalidatePath("/dashboard/projects");
   redirect("/dashboard/projects");
+}
+
+export async function updateProject(_state: ProjectFormState, formData: FormData): Promise<ProjectFormState> {
+  const membership = await getCurrentWorkspace();
+
+  if (!membership || (membership.role !== "OWNER" && membership.role !== "ADMIN")) {
+    return { error: "Only workspace owners and admins can edit projects." };
+  }
+
+  const parsed = projectUpdateSchema.safeParse({
+    projectId: formData.get("projectId"),
+    name: formData.get("name"),
+    key: formData.get("key"),
+    description: formData.get("description") ?? "",
+    status: formData.get("status"),
+    teamId: formData.get("teamId") || undefined,
+  });
+
+  if (!parsed.success) {
+    const fields = parsed.error.flatten().fieldErrors;
+    return { fieldErrors: { name: fields.name?.[0], key: fields.key?.[0], description: fields.description?.[0], status: fields.status?.[0], teamId: fields.teamId?.[0] } };
+  }
+
+  const project = await prisma.project.findFirst({
+    where: { id: parsed.data.projectId, workspaceId: membership.workspace.id },
+    select: { id: true },
+  });
+  if (!project) return { error: "Project not found." };
+
+  if (parsed.data.teamId) {
+    const team = await prisma.team.findFirst({ where: { id: parsed.data.teamId, workspaceId: membership.workspace.id }, select: { id: true } });
+    if (!team) return { fieldErrors: { teamId: "Choose a team from this workspace." } };
+  }
+
+  try {
+    await prisma.project.update({
+      where: { id: project.id },
+      data: {
+        name: parsed.data.name,
+        key: parsed.data.key,
+        description: parsed.data.description || null,
+        status: parsed.data.status,
+        teamId: parsed.data.teamId || null,
+      },
+    });
+  } catch (error) {
+    if (typeof error === "object" && error && "code" in error && error.code === "P2002") {
+      return { fieldErrors: { key: "That project key is already in use." } };
+    }
+    return { error: "We could not update the project. Try again." };
+  }
+
+  revalidatePath("/dashboard");
+  revalidatePath("/dashboard/projects");
+  revalidatePath(`/dashboard/projects/${project.id}`);
+  redirect(`/dashboard/projects/${project.id}`);
 }
