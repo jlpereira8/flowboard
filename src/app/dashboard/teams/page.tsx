@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { getCurrentWorkspace, verifySession } from "@/lib/dal";
@@ -34,6 +35,7 @@ export default async function TeamsPage() {
                     <span className="rounded-full bg-zinc-100 px-2.5 py-1 text-[10px] font-medium text-zinc-500">{team.key}</span>
                   </div>
                   <div className="mt-5 flex gap-5 border-t border-zinc-100 pt-4 text-xs text-zinc-400"><span>{team._count.members} members</span><span>{team._count.projects} projects</span></div>
+                  {membership.role === "OWNER" || membership.role === "ADMIN" ? <Link className="mt-4 inline-block text-xs font-medium text-zinc-500 transition hover:text-zinc-900" href={`/dashboard/teams/${team.id}/edit`}>Edit team →</Link> : null}
                 </article>
               )) : (
                 <div className="grid min-h-72 place-items-center rounded-2xl border border-dashed border-zinc-300 bg-white p-8 text-center"><div><p className="text-sm font-medium">No teams yet</p><p className="mt-2 text-xs text-zinc-400">Create the first team for this workspace.</p></div></div>
