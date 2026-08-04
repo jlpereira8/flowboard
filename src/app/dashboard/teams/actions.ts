@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { z } from "zod";
 
 import { getCurrentWorkspace } from "@/lib/dal";
@@ -11,6 +12,8 @@ const teamSchema = z.object({
   key: z.string().trim().toUpperCase().min(2, "Use at least 2 letters.").max(6, "Use 6 characters or fewer.").regex(/^[A-Z][A-Z0-9]*$/, "Start with a letter and use only letters or numbers."),
   description: z.string().trim().max(180, "Use 180 characters or fewer."),
 });
+
+const teamUpdateSchema = teamSchema.extend({ teamId: z.string().min(1) });
 
 export type TeamFormState = {
   success?: string;
@@ -59,4 +62,30 @@ export async function createTeam(_state: TeamFormState, formData: FormData): Pro
 
   revalidatePath("/dashboard/teams");
   return { success: `${parsed.data.name} was created.` };
+}
+
+export async function updateTeam(_state: TeamFormState, formData: FormData): Promise<TeamFormState> {
+  const membership = await getCurrentWorkspace();
+  if (!membership || (membership.role !== "OWNER" && membership.role !== "ADMIN")) {
+    return { error: "Only workspace owners and admins can edit teams." };
+  }
+
+  const parsed = teamUpdateSchema.safeParse({ teamId: formData.get("teamId"), name: formData.get("name"), key: formData.get("key"), description: formData.get("description") ?? "" });
+  if (!parsed.success) {
+    const fields = parsed.error.flatten().fieldErrors;
+    return { fieldErrors: { name: fields.name?.[0], key: fields.key?.[0], description: fields.description?.[0] } };
+  }
+
+  const team = await prisma.team.findFirst({ where: { id: parsed.data.teamId, workspaceId: membership.workspace.id }, select: { id: true } });
+  if (!team) return { error: "Team not found." };
+
+  try {
+    await prisma.team.update({ where: { id: team.id }, data: { name: parsed.data.name, key: parsed.data.key, description: parsed.data.description || null } });
+  } catch (error) {
+    if (typeof error === "object" && error && "code" in error && error.code === "P2002") return { fieldErrors: { key: "That team key is already in use." } };
+    return { error: "We could not update the team. Try again." };
+  }
+
+  revalidatePath("/dashboard/teams");
+  redirect("/dashboard/teams");
 }

@@ -12,6 +12,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
 
   const project = await prisma.project.findFirst({
     where: { id: projectId, workspaceId: membership.workspace.id },
+    include: { team: { select: { name: true, key: true } } },
   });
 
   if (!project) notFound();
@@ -30,7 +31,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
               <h2 className="mt-4 text-3xl font-semibold tracking-[-0.035em]">{project.name}</h2>
               <p className="mt-3 max-w-2xl text-sm leading-6 text-zinc-500">{project.description || "Add a project description to give the team more context."}</p>
             </div>
-            <button className="rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm font-medium text-zinc-500" disabled>Edit project</button>
+            {membership.role === "OWNER" || membership.role === "ADMIN" ? <Link className="rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm font-medium text-zinc-600 transition hover:border-zinc-300" href={`/dashboard/projects/${project.id}/edit`}>Edit project</Link> : null}
           </div>
 
           <section className="mt-8 grid gap-4 lg:grid-cols-[1.4fr_0.6fr]">
@@ -47,6 +48,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
                 <div><dt className="text-zinc-400">Status</dt><dd className="mt-1 font-medium capitalize">{project.status.toLowerCase()}</dd></div>
                 <div><dt className="text-zinc-400">Created</dt><dd className="mt-1 font-medium">{project.createdAt.toLocaleDateString("en", { dateStyle: "medium" })}</dd></div>
                 <div><dt className="text-zinc-400">Project key</dt><dd className="mt-1 font-medium">{project.key}</dd></div>
+                <div><dt className="text-zinc-400">Team</dt><dd className="mt-1 font-medium">{project.team ? `${project.team.name} (${project.team.key})` : "No team"}</dd></div>
               </dl>
             </article>
           </section>
