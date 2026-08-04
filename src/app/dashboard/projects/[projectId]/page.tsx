@@ -5,15 +5,40 @@ import { AppShell } from "@/components/layout/app-shell";
 import { getCurrentWorkspace, verifySession } from "@/lib/dal";
 import { prisma } from "@/lib/prisma";
 
+import { KanbanBoard } from "./kanban-board";
+import { NewTaskForm } from "./new-task-form";
+
 export default async function ProjectPage({ params }: { params: Promise<{ projectId: string }> }) {
   const [{ projectId }, { user }, membership] = await Promise.all([params, verifySession(), getCurrentWorkspace()]);
 
   if (!membership) redirect("/onboarding");
 
-  const project = await prisma.project.findFirst({
-    where: { id: projectId, workspaceId: membership.workspace.id },
-    include: { team: { select: { name: true, key: true } } },
-  });
+  const [project, members] = await Promise.all([
+    prisma.project.findFirst({
+      where: { id: projectId, workspaceId: membership.workspace.id },
+      include: {
+        team: { select: { name: true, key: true } },
+        tasks: {
+          orderBy: [{ status: "asc" }, { position: "asc" }, { createdAt: "asc" }],
+          select: {
+            id: true,
+            number: true,
+            title: true,
+            description: true,
+            status: true,
+            priority: true,
+            position: true,
+            assignee: { select: { user: { select: { name: true, email: true } } } },
+          },
+        },
+      },
+    }),
+    prisma.member.findMany({
+      where: { workspaceId: membership.workspace.id },
+      orderBy: { createdAt: "asc" },
+      select: { id: true, user: { select: { name: true, email: true } } },
+    }),
+  ]);
 
   if (!project) notFound();
 
@@ -34,24 +59,20 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
             {membership.role === "OWNER" || membership.role === "ADMIN" ? <Link className="rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm font-medium text-zinc-600 transition hover:border-zinc-300" href={`/dashboard/projects/${project.id}/edit`}>Edit project</Link> : null}
           </div>
 
-          <section className="mt-8 grid gap-4 lg:grid-cols-[1.4fr_0.6fr]">
-            <article className="grid min-h-80 place-items-center rounded-2xl border border-zinc-200 bg-white p-8 text-center shadow-sm">
-              <div className="max-w-sm">
-                <span className="mx-auto grid size-11 place-items-center rounded-xl bg-zinc-100 text-zinc-500">✓</span>
-                <h3 className="mt-5 text-sm font-semibold">Tasks are the next layer</h3>
-                <p className="mt-2 text-xs leading-5 text-zinc-400">The project foundation is ready for the Kanban and task workflow in Phase 3.</p>
-              </div>
-            </article>
-            <article className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
+          <section className="mt-8 grid gap-4 lg:grid-cols-[1fr_280px]">
+            <NewTaskForm members={members.map((member) => ({ id: member.id, name: member.user.name || "", email: member.user.email || "" }))} projectId={project.id} />
+            <article className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
               <h3 className="text-sm font-semibold">Project details</h3>
-              <dl className="mt-6 space-y-5 text-xs">
+              <dl className="mt-4 grid grid-cols-2 gap-4 text-xs lg:grid-cols-1">
                 <div><dt className="text-zinc-400">Status</dt><dd className="mt-1 font-medium capitalize">{project.status.toLowerCase()}</dd></div>
-                <div><dt className="text-zinc-400">Created</dt><dd className="mt-1 font-medium">{project.createdAt.toLocaleDateString("en", { dateStyle: "medium" })}</dd></div>
                 <div><dt className="text-zinc-400">Project key</dt><dd className="mt-1 font-medium">{project.key}</dd></div>
                 <div><dt className="text-zinc-400">Team</dt><dd className="mt-1 font-medium">{project.team ? `${project.team.name} (${project.team.key})` : "No team"}</dd></div>
+                <div><dt className="text-zinc-400">Tasks</dt><dd className="mt-1 font-medium">{project.tasks.length}</dd></div>
               </dl>
             </article>
           </section>
+
+          <KanbanBoard initialTasks={project.tasks} projectId={project.id} projectKey={project.key} />
         </div>
       </main>
     </AppShell>
