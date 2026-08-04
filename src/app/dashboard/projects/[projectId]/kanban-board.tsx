@@ -3,6 +3,7 @@
 import { DndContext, PointerSensor, useDroppable, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import Link from "next/link";
 import { useState, useTransition } from "react";
 
 import { updateTaskBoard } from "./task-actions";
@@ -38,20 +39,24 @@ function initials(task: TaskCard) {
   return value.split(/[\s@]/).filter(Boolean).slice(0, 2).map((part) => part[0]?.toUpperCase()).join("");
 }
 
-function SortableTask({ projectKey, task, onStep }: { projectKey: string; task: TaskCard; onStep: (taskId: string, direction: -1 | 1) => void }) {
+function SortableTask({ projectId, projectKey, task, onStep }: { projectId: string; projectKey: string; task: TaskCard; onStep: (taskId: string, direction: -1 | 1) => void }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task.id });
   const columnIndex = columns.findIndex((column) => column.id === task.status);
 
   return (
     <article className={`rounded-xl border border-zinc-200 bg-white p-3.5 shadow-sm transition ${isDragging ? "z-10 opacity-60 shadow-lg" : "hover:border-zinc-300"}`} ref={setNodeRef} style={{ transform: CSS.Transform.toString(transform), transition }}>
-      <button aria-label={`Drag ${projectKey}-${task.number}`} className="w-full cursor-grab text-left active:cursor-grabbing" type="button" {...attributes} {...listeners}>
-        <div className="flex items-center justify-between gap-2">
-          <span className="text-[11px] font-medium text-zinc-400">{projectKey}-{task.number}</span>
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[11px] font-medium text-zinc-400">{projectKey}-{task.number}</span>
+        <div className="flex items-center gap-1.5">
           <span className={`rounded-md px-1.5 py-0.5 text-[9px] font-semibold ${priorityStyle[task.priority]}`}>{task.priority.toLowerCase()}</span>
+          <button aria-label={`Drag ${projectKey}-${task.number}`} className="cursor-grab rounded-md px-1.5 py-0.5 text-xs text-zinc-300 transition hover:bg-zinc-100 hover:text-zinc-500 active:cursor-grabbing" type="button" {...attributes} {...listeners}>⠿</button>
         </div>
+      </div>
+      <Link className="group block" href={`/dashboard/projects/${projectId}/tasks/${task.id}`}>
         <h4 className="mt-2 text-sm font-medium leading-5 text-zinc-800">{task.title}</h4>
         {task.description ? <p className="mt-1.5 line-clamp-2 text-[11px] leading-4 text-zinc-400">{task.description}</p> : null}
-      </button>
+        <span className="mt-2 block text-[10px] font-medium text-zinc-300 transition group-hover:text-zinc-500">Open task →</span>
+      </Link>
       <div className="mt-3 flex items-center justify-between border-t border-zinc-100 pt-2.5">
         {task.assignee ? <span className="grid size-6 place-items-center rounded-full bg-zinc-100 text-[9px] font-semibold text-zinc-600" title={task.assignee.user.name || task.assignee.user.email || "Assigned"}>{initials(task)}</span> : <span className="text-[10px] text-zinc-300">Unassigned</span>}
         <div className="flex gap-1">
@@ -131,7 +136,7 @@ export function KanbanBoard({ initialTasks, projectId, projectKey }: { initialTa
         <div className="grid gap-3 xl:grid-cols-4">
           {columns.map((column) => {
             const columnTasks = tasks.filter((task) => task.status === column.id).sort((a, b) => a.position - b.position);
-            return <Column accent={column.accent} count={columnTasks.length} id={column.id} key={column.id} label={column.label}><SortableContext items={columnTasks.map((task) => task.id)} strategy={verticalListSortingStrategy}><div className="space-y-2">{columnTasks.map((task) => <SortableTask key={task.id} onStep={onStep} projectKey={projectKey} task={task} />)}{columnTasks.length === 0 ? <div className="grid min-h-24 place-items-center rounded-xl border border-dashed border-zinc-200 text-[11px] text-zinc-300">Drop tasks here</div> : null}</div></SortableContext></Column>;
+            return <Column accent={column.accent} count={columnTasks.length} id={column.id} key={column.id} label={column.label}><SortableContext items={columnTasks.map((task) => task.id)} strategy={verticalListSortingStrategy}><div className="space-y-2">{columnTasks.map((task) => <SortableTask key={task.id} onStep={onStep} projectId={projectId} projectKey={projectKey} task={task} />)}{columnTasks.length === 0 ? <div className="grid min-h-24 place-items-center rounded-xl border border-dashed border-zinc-200 text-[11px] text-zinc-300">Drop tasks here</div> : null}</div></SortableContext></Column>;
           })}
         </div>
       </DndContext>
