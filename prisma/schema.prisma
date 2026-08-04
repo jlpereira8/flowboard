@@ -39,6 +39,13 @@ enum TaskPriority {
   URGENT
 }
 
+enum TaskActivityType {
+  CREATED
+  UPDATED
+  STATUS_CHANGED
+  COMMENTED
+}
+
 model User {
   id              String                @id @default(cuid())
   name            String?
@@ -51,6 +58,8 @@ model User {
   ownedWorkspaces Workspace[]           @relation("WorkspaceOwner")
   createdProjects Project[]             @relation("ProjectCreator")
   createdTasks    Task[]                @relation("TaskCreator")
+  taskComments    TaskComment[]
+  taskActivities  TaskActivity[]
   sentInvitations WorkspaceInvitation[] @relation("InvitationSender")
   createdAt       DateTime              @default(now())
   updatedAt       DateTime              @updatedAt
@@ -151,26 +160,57 @@ model Member {
 }
 
 model Task {
-  id          String       @id @default(cuid())
+  id          String         @id @default(cuid())
   number      Int
   title       String
   description String?
-  status      TaskStatus   @default(TODO)
-  priority    TaskPriority @default(MEDIUM)
-  position    Int          @default(0)
+  status      TaskStatus     @default(TODO)
+  priority    TaskPriority   @default(MEDIUM)
+  position    Int            @default(0)
+  dueDate     DateTime?
   projectId   String
   assigneeId  String?
   createdById String
-  project     Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  assignee    Member?      @relation(fields: [assigneeId], references: [id], onDelete: SetNull)
-  createdBy   User         @relation("TaskCreator", fields: [createdById], references: [id], onDelete: Restrict)
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  project     Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  assignee    Member?        @relation(fields: [assigneeId], references: [id], onDelete: SetNull)
+  createdBy   User           @relation("TaskCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  comments    TaskComment[]
+  activities  TaskActivity[]
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
 
   @@unique([projectId, number])
   @@index([projectId, status, position])
   @@index([assigneeId])
   @@index([createdById])
+}
+
+model TaskComment {
+  id        String   @id @default(cuid())
+  body      String
+  taskId    String
+  authorId  String
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  author    User     @relation(fields: [authorId], references: [id], onDelete: Restrict)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([taskId, createdAt])
+  @@index([authorId])
+}
+
+model TaskActivity {
+  id        String           @id @default(cuid())
+  type      TaskActivityType
+  message   String
+  taskId    String
+  actorId   String
+  task      Task             @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  actor     User             @relation(fields: [actorId], references: [id], onDelete: Restrict)
+  createdAt DateTime         @default(now())
+
+  @@index([taskId, createdAt])
+  @@index([actorId])
 }
 
 model Team {
