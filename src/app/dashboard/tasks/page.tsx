@@ -24,7 +24,7 @@ export default async function TasksPage() {
           {tasks.length ? (
             <section className="mt-8 overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
               {tasks.map((task) => (
-                <Link className="grid gap-3 border-b border-zinc-100 px-5 py-4 transition last:border-0 hover:bg-zinc-50 sm:grid-cols-[100px_1fr_120px_90px] sm:items-center" href={`/dashboard/projects/${task.project.id}`} key={task.id}>
+                <Link className="grid gap-3 border-b border-zinc-100 px-5 py-4 transition last:border-0 hover:bg-zinc-50 sm:grid-cols-[100px_1fr_120px_90px] sm:items-center" href={`/dashboard/projects/${task.project.id}/tasks/${task.id}`} key={task.id}>
                   <span className="text-xs font-medium text-zinc-400">{task.project.key}-{task.number}</span>
                   <span><span className="block text-sm font-medium text-zinc-800">{task.title}</span><span className="mt-1 block text-[11px] text-zinc-400">{task.project.name}</span></span>
                   <span className="text-xs capitalize text-zinc-500">{task.status.toLowerCase().replace("_", " ")}</span>

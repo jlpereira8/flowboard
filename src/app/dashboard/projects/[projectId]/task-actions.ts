@@ -83,6 +83,13 @@ export async function createTask(_state: TaskFormState, formData: FormData): Pro
           projectId: project.id,
           assigneeId: parsed.data.assigneeId || null,
           createdById: userId,
+          activities: {
+            create: {
+              type: "CREATED",
+              message: "created the task",
+              actorId: userId,
+            },
+          },
         },
       });
     });
@@ -97,7 +104,7 @@ export async function createTask(_state: TaskFormState, formData: FormData): Pro
 }
 
 export async function updateTaskBoard(projectId: string, updates: Array<{ id: string; status: string; position: number }>) {
-  const membership = await getCurrentWorkspace();
+  const [{ userId }, membership] = await Promise.all([verifySession(), getCurrentWorkspace()]);
   if (!membership) return { error: "Workspace not found." };
 
   const parsed = boardUpdateSchema.safeParse({ projectId, updates });
@@ -112,14 +119,31 @@ export async function updateTaskBoard(projectId: string, updates: Array<{ id: st
   });
   if (!project) return { error: "Project not found." };
 
-  const ownedTaskCount = await prisma.task.count({ where: { id: { in: uniqueIds }, projectId: project.id } });
-  if (ownedTaskCount !== uniqueIds.length) return { error: "One or more tasks do not belong to this project." };
+  const ownedTasks = await prisma.task.findMany({
+    where: { id: { in: uniqueIds }, projectId: project.id },
+    select: { id: true, status: true },
+  });
+  if (ownedTasks.length !== uniqueIds.length) return { error: "One or more tasks do not belong to this project." };
+
+  const previousStatus = new Map(ownedTasks.map((task) => [task.id, task.status]));
+  const statusLabel = { TODO: "Todo", IN_PROGRESS: "In progress", REVIEW: "Review", DONE: "Done" } as const;
+  const statusChanges = parsed.data.updates.filter((update) => previousStatus.get(update.id) !== update.status);
 
   try {
-    await prisma.$transaction(parsed.data.updates.map((update) => prisma.task.update({
-      where: { id: update.id },
-      data: { status: update.status, position: update.position },
-    })));
+    await prisma.$transaction([
+      ...parsed.data.updates.map((update) => prisma.task.update({
+        where: { id: update.id },
+        data: { status: update.status, position: update.position },
+      })),
+      ...(statusChanges.length ? [prisma.taskActivity.createMany({
+        data: statusChanges.map((update) => ({
+          taskId: update.id,
+          actorId: userId,
+          type: "STATUS_CHANGED",
+          message: `moved the task from ${statusLabel[previousStatus.get(update.id)!]} to ${statusLabel[update.status]}`,
+        })),
+      })] : []),
+    ]);
   } catch {
     return { error: "We could not save the board order. Try again." };
   }
