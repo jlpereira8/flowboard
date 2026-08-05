@@ -4,6 +4,8 @@ import { signOutUser } from "@/app/actions/auth";
 import { getCurrentWorkspace, verifySession } from "@/lib/dal";
 import { prisma } from "@/lib/prisma";
 
+import { MobileNavigation } from "./mobile-navigation";
+
 type AppShellProps = {
   children: React.ReactNode;
   activeItem?: "overview" | "projects" | "teams" | "members" | "tasks" | "notifications" | "calendar" | "settings";
@@ -90,16 +92,22 @@ export async function AppShell({ activeItem = "overview", action, children, titl
       </aside>
 
       <div className="min-w-0">
-        <header className="flex h-16 items-center justify-between border-b border-zinc-200 bg-white px-5 lg:px-8">
-          <div>
+        <header className="flex h-16 items-center justify-between gap-3 border-b border-zinc-200 bg-white px-4 sm:px-5 lg:px-8">
+          <div className="flex min-w-0 items-center gap-3">
+            <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-zinc-950 text-xs font-semibold text-white lg:hidden">F</span>
+            <div className="min-w-0">
             <p className="text-xs text-zinc-400">{workspace.slug}</p>
-            <h1 className="text-sm font-semibold">{title}</h1>
+            <h1 className="truncate text-sm font-semibold">{title}</h1>
+            </div>
           </div>
-          {headerAction ? (
-            <Link className="rounded-xl bg-zinc-950 px-4 py-2 text-xs font-medium text-white transition hover:bg-zinc-800" href={headerAction.href}>
-              {headerAction.label}
-            </Link>
-          ) : null}
+          <div className="flex shrink-0 items-center gap-2">
+            {headerAction ? (
+              <Link className="rounded-xl bg-zinc-950 px-3 py-2 text-xs font-medium text-white transition hover:bg-zinc-800 sm:px-4" href={headerAction.href}>
+                {headerAction.label}
+              </Link>
+            ) : null}
+            <MobileNavigation activeItem={activeItem} initials={initials} items={navigation} unreadNotifications={unreadNotifications} user={user} workspace={workspace} />
+          </div>
         </header>
         {children}
       </div>
