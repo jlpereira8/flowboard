@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { getCurrentWorkspace, verifySession } from "@/lib/dal";
+import { buildTaskNotifications, taskHref } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
 
 const taskDetailsSchema = z.object({
@@ -84,6 +85,7 @@ function refreshTask(projectId: string, taskId: string) {
   revalidatePath(`/dashboard/projects/${projectId}`);
   revalidatePath("/dashboard/tasks");
   revalidatePath("/dashboard/calendar");
+  revalidatePath("/dashboard/notifications");
   revalidatePath("/dashboard");
 }
 
@@ -134,17 +136,22 @@ export async function updateTaskDetails(_state: TaskDetailsState, formData: Form
       status: true,
       priority: true,
       assigneeId: true,
+      createdById: true,
       dueDate: true,
+      number: true,
+      project: { select: { key: true } },
     },
   });
   if (!task) return { error: "Task not found." };
 
+  let nextAssigneeUserId: string | null = null;
   if (parsed.data.assigneeId) {
     const assignee = await prisma.member.findFirst({
       where: { id: parsed.data.assigneeId, workspaceId: membership.workspace.id },
-      select: { id: true },
+      select: { id: true, userId: true },
     });
     if (!assignee) return { fieldErrors: { assigneeId: "Choose a member from this workspace." } };
+    nextAssigneeUserId = assignee.userId;
   }
 
   const nextDueDate = parsed.data.dueDate ? new Date(`${parsed.data.dueDate}T12:00:00.000Z`) : null;
@@ -190,6 +197,30 @@ export async function updateTaskDetails(_state: TaskDetailsState, formData: Form
           data: activities.map((activity) => ({ ...activity, taskId: task.id, actorId: userId })),
         });
       }
+
+      const notifications = [
+        ...(task.assigneeId !== (parsed.data.assigneeId || null) && nextAssigneeUserId ? buildTaskNotifications({
+          type: "TASK_ASSIGNED",
+          title: `${task.project.key}-${task.number} assigned to you`,
+          message: `assigned you “${parsed.data.title}”`,
+          href: taskHref(parsed.data.projectId, task.id),
+          recipientIds: [nextAssigneeUserId],
+          actorId: userId,
+          workspaceId: membership.workspace.id,
+          taskId: task.id,
+        }) : []),
+        ...(statusChanged ? buildTaskNotifications({
+          type: "STATUS_CHANGED",
+          title: `${task.project.key}-${task.number} moved to ${statusLabel[parsed.data.status]}`,
+          message: `moved “${parsed.data.title}” from ${statusLabel[task.status]} to ${statusLabel[parsed.data.status]}`,
+          href: taskHref(parsed.data.projectId, task.id),
+          recipientIds: [nextAssigneeUserId, task.createdById],
+          actorId: userId,
+          workspaceId: membership.workspace.id,
+          taskId: task.id,
+        }) : []),
+      ];
+      if (notifications.length) await tx.notification.createMany({ data: notifications });
     });
   } catch {
     return { error: "We could not update the task. Try again." };
@@ -216,14 +247,32 @@ export async function addTaskComment(_state: CommentState, formData: FormData): 
       projectId: parsed.data.projectId,
       project: { workspaceId: membership.workspace.id },
     },
-    select: { id: true },
+    select: {
+      id: true,
+      title: true,
+      number: true,
+      createdById: true,
+      assignee: { select: { userId: true } },
+      project: { select: { key: true } },
+    },
   });
   if (!task) return { error: "Task not found." };
 
   try {
+    const notifications = buildTaskNotifications({
+      type: "COMMENT_ADDED",
+      title: `New comment on ${task.project.key}-${task.number}`,
+      message: `commented on “${task.title}”`,
+      href: taskHref(parsed.data.projectId, task.id),
+      recipientIds: [task.assignee?.userId, task.createdById],
+      actorId: userId,
+      workspaceId: membership.workspace.id,
+      taskId: task.id,
+    });
     await prisma.$transaction([
       prisma.taskComment.create({ data: { body: parsed.data.body, taskId: task.id, authorId: userId } }),
       prisma.taskActivity.create({ data: { type: "COMMENTED", message: "added a comment", taskId: task.id, actorId: userId } }),
+      ...(notifications.length ? [prisma.notification.createMany({ data: notifications })] : []),
     ]);
   } catch {
     return { error: "We could not add the comment. Try again." };
