@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { getCurrentWorkspace, verifySession } from "@/lib/dal";
+import { buildTaskNotifications, taskHref } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
 
 const taskSchema = z.object({
@@ -48,16 +49,18 @@ export async function createTask(_state: TaskFormState, formData: FormData): Pro
 
   const project = await prisma.project.findFirst({
     where: { id: parsed.data.projectId, workspaceId: membership.workspace.id },
-    select: { id: true },
+    select: { id: true, key: true },
   });
   if (!project) return { error: "Project not found." };
 
+  let assigneeUserId: string | null = null;
   if (parsed.data.assigneeId) {
     const assignee = await prisma.member.findFirst({
       where: { id: parsed.data.assigneeId, workspaceId: membership.workspace.id },
-      select: { id: true },
+      select: { id: true, userId: true },
     });
     if (!assignee) return { fieldErrors: { assigneeId: "Choose a member from this workspace." } };
+    assigneeUserId = assignee.userId;
   }
 
   try {
@@ -73,7 +76,7 @@ export async function createTask(_state: TaskFormState, formData: FormData): Pro
         select: { position: true },
       });
 
-      await tx.task.create({
+      const task = await tx.task.create({
         data: {
           number: numberedProject.nextTaskNumber - 1,
           title: parsed.data.title,
@@ -92,6 +95,20 @@ export async function createTask(_state: TaskFormState, formData: FormData): Pro
           },
         },
       });
+
+      if (assigneeUserId) {
+        const notifications = buildTaskNotifications({
+          type: "TASK_ASSIGNED",
+          title: `${project.key}-${task.number} assigned to you`,
+          message: `assigned you “${task.title}”`,
+          href: taskHref(project.id, task.id),
+          recipientIds: [assigneeUserId],
+          actorId: userId,
+          workspaceId: membership.workspace.id,
+          taskId: task.id,
+        });
+        if (notifications.length) await tx.notification.createMany({ data: notifications });
+      }
     });
   } catch {
     return { error: "We could not create the task. Try again." };
@@ -99,6 +116,7 @@ export async function createTask(_state: TaskFormState, formData: FormData): Pro
 
   revalidatePath(`/dashboard/projects/${project.id}`);
   revalidatePath("/dashboard/tasks");
+  revalidatePath("/dashboard/notifications");
   revalidatePath("/dashboard");
   return { success: true };
 }
@@ -115,19 +133,40 @@ export async function updateTaskBoard(projectId: string, updates: Array<{ id: st
 
   const project = await prisma.project.findFirst({
     where: { id: parsed.data.projectId, workspaceId: membership.workspace.id },
-    select: { id: true },
+    select: { id: true, key: true },
   });
   if (!project) return { error: "Project not found." };
 
   const ownedTasks = await prisma.task.findMany({
     where: { id: { in: uniqueIds }, projectId: project.id },
-    select: { id: true, status: true },
+    select: {
+      id: true,
+      status: true,
+      title: true,
+      number: true,
+      createdById: true,
+      assignee: { select: { userId: true } },
+    },
   });
   if (ownedTasks.length !== uniqueIds.length) return { error: "One or more tasks do not belong to this project." };
 
   const previousStatus = new Map(ownedTasks.map((task) => [task.id, task.status]));
   const statusLabel = { TODO: "Todo", IN_PROGRESS: "In progress", REVIEW: "Review", DONE: "Done" } as const;
   const statusChanges = parsed.data.updates.filter((update) => previousStatus.get(update.id) !== update.status);
+  const taskById = new Map(ownedTasks.map((task) => [task.id, task]));
+  const notifications = statusChanges.flatMap((update) => {
+    const task = taskById.get(update.id)!;
+    return buildTaskNotifications({
+      type: "STATUS_CHANGED",
+      title: `${project.key}-${task.number} moved to ${statusLabel[update.status]}`,
+      message: `moved “${task.title}” from ${statusLabel[task.status]} to ${statusLabel[update.status]}`,
+      href: taskHref(project.id, task.id),
+      recipientIds: [task.assignee?.userId, task.createdById],
+      actorId: userId,
+      workspaceId: membership.workspace.id,
+      taskId: task.id,
+    });
+  });
 
   try {
     await prisma.$transaction([
@@ -143,6 +182,7 @@ export async function updateTaskBoard(projectId: string, updates: Array<{ id: st
           message: `moved the task from ${statusLabel[previousStatus.get(update.id)!]} to ${statusLabel[update.status]}`,
         })),
       })] : []),
+      ...(notifications.length ? [prisma.notification.createMany({ data: notifications })] : []),
     ]);
   } catch {
     return { error: "We could not save the board order. Try again." };
@@ -150,6 +190,7 @@ export async function updateTaskBoard(projectId: string, updates: Array<{ id: st
 
   revalidatePath(`/dashboard/projects/${project.id}`);
   revalidatePath("/dashboard/tasks");
+  revalidatePath("/dashboard/notifications");
   revalidatePath("/dashboard");
   return { success: true };
 }

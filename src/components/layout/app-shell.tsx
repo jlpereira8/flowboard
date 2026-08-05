@@ -1,10 +1,12 @@
 import Link from "next/link";
 
 import { signOutUser } from "@/app/actions/auth";
+import { getCurrentWorkspace, verifySession } from "@/lib/dal";
+import { prisma } from "@/lib/prisma";
 
 type AppShellProps = {
   children: React.ReactNode;
-  activeItem?: "overview" | "projects" | "teams" | "members" | "tasks" | "calendar";
+  activeItem?: "overview" | "projects" | "teams" | "members" | "tasks" | "notifications" | "calendar";
   action?: { label: string; href: string } | null;
   title?: string;
   user: {
@@ -23,10 +25,15 @@ const navigation = [
   { id: "teams", label: "Teams", href: "/dashboard/teams" },
   { id: "members", label: "Members", href: "/dashboard/members" },
   { id: "tasks", label: "My tasks", href: "/dashboard/tasks" },
+  { id: "notifications", label: "Notifications", href: "/dashboard/notifications" },
   { id: "calendar", label: "Calendar", href: "/dashboard/calendar" },
 ] as const;
 
-export function AppShell({ activeItem = "overview", action, children, title = "Overview", user, workspace }: AppShellProps) {
+export async function AppShell({ activeItem = "overview", action, children, title = "Overview", user, workspace }: AppShellProps) {
+  const [{ userId }, membership] = await Promise.all([verifySession(), getCurrentWorkspace()]);
+  const unreadNotifications = membership ? await prisma.notification.count({
+    where: { recipientId: userId, workspaceId: membership.workspace.id, readAt: null },
+  }) : 0;
   const headerAction = action === undefined ? { label: "New project", href: "/dashboard/projects/new" } : action;
   const initials = (user.name || user.email || "FB")
     .split(/[\s@]/)
@@ -57,7 +64,10 @@ export function AppShell({ activeItem = "overview", action, children, title = "O
               href={item.href}
               key={item.label}
             >
-              {item.label}
+              <span className="flex items-center justify-between gap-3">
+                <span>{item.label}</span>
+                {item.id === "notifications" && unreadNotifications ? <span className="min-w-5 rounded-full bg-zinc-950 px-1.5 py-0.5 text-center text-[9px] font-semibold text-white">{unreadNotifications > 99 ? "99+" : unreadNotifications}</span> : null}
+              </span>
             </Link>
           ))}
         </nav>
