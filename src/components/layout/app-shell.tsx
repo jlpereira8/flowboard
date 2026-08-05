@@ -5,6 +5,7 @@ import { getCurrentWorkspace, verifySession } from "@/lib/dal";
 import { prisma } from "@/lib/prisma";
 
 import { MobileNavigation } from "./mobile-navigation";
+import { GlobalSearch } from "./global-search";
 
 type AppShellProps = {
   children: React.ReactNode;
@@ -101,6 +102,7 @@ export async function AppShell({ activeItem = "overview", action, children, titl
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-2">
+            <GlobalSearch />
             {headerAction ? (
               <Link className="rounded-xl bg-zinc-950 px-3 py-2 text-xs font-medium text-white transition hover:bg-zinc-800 sm:px-4" href={headerAction.href}>
                 {headerAction.label}
