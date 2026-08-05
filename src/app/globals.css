@@ -21,3 +21,97 @@ body {
 * {
   box-sizing: border-box;
 }
+
+[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  [data-theme="system"] {
+    color-scheme: dark;
+  }
+}
+
+[data-theme="dark"] .bg-white,
+[data-theme="dark"] aside,
+[data-theme="dark"] header,
+[data-theme="dark"] input,
+[data-theme="dark"] textarea,
+[data-theme="dark"] select {
+  background-color: #18181b !important;
+  color: #e4e4e7;
+}
+
+[data-theme="dark"].bg-\[\#f7f7f5\],
+[data-theme="dark"] .bg-\[\#f7f7f5\] {
+  background-color: #111113 !important;
+}
+
+[data-theme="dark"] .bg-zinc-50,
+[data-theme="dark"] .bg-zinc-100 {
+  background-color: #27272a !important;
+}
+
+[data-theme="dark"] .border-zinc-100,
+[data-theme="dark"] .border-zinc-200 {
+  border-color: #3f3f46 !important;
+}
+
+[data-theme="dark"] .text-zinc-950,
+[data-theme="dark"] .text-zinc-800,
+[data-theme="dark"] .text-zinc-700 {
+  color: #e4e4e7 !important;
+}
+
+[data-theme="dark"] .text-zinc-600,
+[data-theme="dark"] .text-zinc-500 {
+  color: #a1a1aa !important;
+}
+
+[data-theme="dark"] .bg-zinc-950 {
+  background-color: #f4f4f5 !important;
+  color: #18181b !important;
+}
+
+@media (prefers-color-scheme: dark) {
+  [data-theme="system"] .bg-white,
+  [data-theme="system"] aside,
+  [data-theme="system"] header,
+  [data-theme="system"] input,
+  [data-theme="system"] textarea,
+  [data-theme="system"] select {
+    background-color: #18181b !important;
+    color: #e4e4e7;
+  }
+
+  [data-theme="system"].bg-\[\#f7f7f5\],
+  [data-theme="system"] .bg-\[\#f7f7f5\] {
+    background-color: #111113 !important;
+  }
+
+  [data-theme="system"] .bg-zinc-50,
+  [data-theme="system"] .bg-zinc-100 {
+    background-color: #27272a !important;
+  }
+
+  [data-theme="system"] .border-zinc-100,
+  [data-theme="system"] .border-zinc-200 {
+    border-color: #3f3f46 !important;
+  }
+
+  [data-theme="system"] .text-zinc-950,
+  [data-theme="system"] .text-zinc-800,
+  [data-theme="system"] .text-zinc-700 {
+    color: #e4e4e7 !important;
+  }
+
+  [data-theme="system"] .text-zinc-600,
+  [data-theme="system"] .text-zinc-500 {
+    color: #a1a1aa !important;
+  }
+
+  [data-theme="system"] .bg-zinc-950 {
+    background-color: #f4f4f5 !important;
+    color: #18181b !important;
+  }
+}

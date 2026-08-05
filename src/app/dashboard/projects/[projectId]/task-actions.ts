@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { getCurrentWorkspace, verifySession } from "@/lib/dal";
-import { buildTaskNotifications, taskHref } from "@/lib/notifications";
+import { buildTaskNotifications, eligibleNotificationRecipients, taskHref } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
 
 const taskSchema = z.object({
@@ -62,6 +62,12 @@ export async function createTask(_state: TaskFormState, formData: FormData): Pro
     if (!assignee) return { fieldErrors: { assigneeId: "Choose a member from this workspace." } };
     assigneeUserId = assignee.userId;
   }
+  const assignmentRecipients = await eligibleNotificationRecipients({
+    type: "TASK_ASSIGNED",
+    candidateIds: [assigneeUserId],
+    actorId: userId,
+    workspaceId: membership.workspace.id,
+  });
 
   try {
     await prisma.$transaction(async (tx) => {
@@ -96,13 +102,13 @@ export async function createTask(_state: TaskFormState, formData: FormData): Pro
         },
       });
 
-      if (assigneeUserId) {
+      if (assignmentRecipients.length) {
         const notifications = buildTaskNotifications({
           type: "TASK_ASSIGNED",
           title: `${project.key}-${task.number} assigned to you`,
           message: `assigned you “${task.title}”`,
           href: taskHref(project.id, task.id),
-          recipientIds: [assigneeUserId],
+          recipientIds: assignmentRecipients,
           actorId: userId,
           workspaceId: membership.workspace.id,
           taskId: task.id,
@@ -154,6 +160,15 @@ export async function updateTaskBoard(projectId: string, updates: Array<{ id: st
   const statusLabel = { TODO: "Todo", IN_PROGRESS: "In progress", REVIEW: "Review", DONE: "Done" } as const;
   const statusChanges = parsed.data.updates.filter((update) => previousStatus.get(update.id) !== update.status);
   const taskById = new Map(ownedTasks.map((task) => [task.id, task]));
+  const statusRecipients = new Set(await eligibleNotificationRecipients({
+    type: "STATUS_CHANGED",
+    candidateIds: statusChanges.flatMap((update) => {
+      const task = taskById.get(update.id)!;
+      return [task.assignee?.userId, task.createdById];
+    }),
+    actorId: userId,
+    workspaceId: membership.workspace.id,
+  }));
   const notifications = statusChanges.flatMap((update) => {
     const task = taskById.get(update.id)!;
     return buildTaskNotifications({
@@ -161,7 +176,7 @@ export async function updateTaskBoard(projectId: string, updates: Array<{ id: st
       title: `${project.key}-${task.number} moved to ${statusLabel[update.status]}`,
       message: `moved “${task.title}” from ${statusLabel[task.status]} to ${statusLabel[update.status]}`,
       href: taskHref(project.id, task.id),
-      recipientIds: [task.assignee?.userId, task.createdById],
+      recipientIds: [task.assignee?.userId, task.createdById].filter((candidateId) => candidateId && statusRecipients.has(candidateId)),
       actorId: userId,
       workspaceId: membership.workspace.id,
       taskId: task.id,

@@ -28,6 +28,10 @@ export const getCurrentWorkspace = cache(async () => {
     select: {
       id: true,
       role: true,
+      notifyTaskAssigned: true,
+      notifyComments: true,
+      notifyStatusChanges: true,
+      theme: true,
       workspace: {
         select: {
           id: true,
