@@ -6,6 +6,7 @@ import { getCurrentWorkspace, verifySession } from "@/lib/dal";
 import { prisma } from "@/lib/prisma";
 
 import { CommentForm } from "./comment-form";
+import { AttachmentManager } from "./attachment-manager";
 import { LabelManager } from "./label-manager";
 import { TaskDetailsForm } from "./task-details-form";
 
@@ -35,7 +36,7 @@ const statusStyle = {
 const statusLabel = { TODO: "Todo", IN_PROGRESS: "In progress", REVIEW: "Review", DONE: "Done" } as const;
 
 export default async function TaskPage({ params }: { params: Promise<{ projectId: string; taskId: string }> }) {
-  const [{ projectId, taskId }, { user }, membership] = await Promise.all([params, verifySession(), getCurrentWorkspace()]);
+  const [{ projectId, taskId }, { user, userId }, membership] = await Promise.all([params, verifySession(), getCurrentWorkspace()]);
   if (!membership) redirect("/onboarding");
 
   const [task, members, workspaceLabels] = await Promise.all([
@@ -56,6 +57,10 @@ export default async function TaskPage({ params }: { params: Promise<{ projectId
         labels: {
           orderBy: { createdAt: "asc" },
           include: { label: { select: { id: true, name: true, color: true } } },
+        },
+        attachments: {
+          orderBy: { createdAt: "desc" },
+          include: { uploadedBy: { select: { name: true, email: true } } },
         },
       },
     }),
@@ -96,6 +101,20 @@ export default async function TaskPage({ params }: { params: Promise<{ projectId
                 <div className="mb-6"><p className="text-xs font-medium uppercase tracking-[0.14em] text-zinc-400">Task details</p><h3 className="mt-1 text-lg font-semibold">Plan and track the work</h3></div>
                 <TaskDetailsForm members={members.map((member) => ({ id: member.id, name: member.user.name || "", email: member.user.email || "" }))} task={{ id: task.id, projectId: task.projectId, title: task.title, description: task.description, status: task.status, priority: task.priority, assigneeId: task.assigneeId, dueDate: task.dueDate?.toISOString().slice(0, 10) || "" }} />
               </section>
+
+              <AttachmentManager
+                attachments={task.attachments.map((attachment) => ({
+                  id: attachment.id,
+                  name: attachment.name,
+                  contentType: attachment.contentType,
+                  size: attachment.size,
+                  createdAt: attachment.createdAt.toISOString(),
+                  uploader: personName(attachment.uploadedBy),
+                  canDelete: attachment.uploadedById === userId || membership.role === "OWNER" || membership.role === "ADMIN",
+                }))}
+                projectId={task.projectId}
+                taskId={task.id}
+              />
 
               <section className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm sm:p-8">
                 <div className="flex items-end justify-between gap-4"><div><p className="text-xs font-medium uppercase tracking-[0.14em] text-zinc-400">Discussion</p><h3 className="mt-1 text-lg font-semibold">Comments</h3></div><span className="text-xs text-zinc-400">{task.comments.length}</span></div>

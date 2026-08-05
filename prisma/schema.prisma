@@ -69,6 +69,7 @@ model User {
   createdTasks    Task[]                @relation("TaskCreator")
   taskComments    TaskComment[]
   taskActivities  TaskActivity[]
+  taskAttachments TaskAttachment[]
   sentInvitations WorkspaceInvitation[] @relation("InvitationSender")
   createdAt       DateTime              @default(now())
   updatedAt       DateTime              @updatedAt
@@ -187,6 +188,7 @@ model Task {
   comments    TaskComment[]
   activities  TaskActivity[]
   labels      TaskLabelAssignment[]
+  attachments TaskAttachment[]
   createdAt   DateTime              @default(now())
   updatedAt   DateTime              @updatedAt
 
@@ -194,6 +196,22 @@ model Task {
   @@index([projectId, status, position])
   @@index([assigneeId])
   @@index([createdById])
+}
+
+model TaskAttachment {
+  id           String   @id @default(cuid())
+  name         String
+  pathname     String   @unique
+  contentType  String
+  size         Int
+  taskId       String
+  uploadedById String
+  task         Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  uploadedBy   User     @relation(fields: [uploadedById], references: [id], onDelete: Restrict)
+  createdAt    DateTime @default(now())
+
+  @@index([taskId, createdAt])
+  @@index([uploadedById])
 }
 
 model TaskLabel {
