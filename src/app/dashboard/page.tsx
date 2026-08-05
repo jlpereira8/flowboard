@@ -80,9 +80,9 @@ export default async function DashboardPage() {
             <h2 className="mt-1 text-2xl font-semibold tracking-[-0.035em] sm:text-3xl">Workspace overview</h2>
           </div>
 
-          <section className="mt-7 grid grid-cols-2 gap-3 xl:grid-cols-4">
+          <section className="mt-7 grid grid-cols-1 gap-3 min-[360px]:grid-cols-2 xl:grid-cols-4">
             {metrics.map((metric) => (
-              <article className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm sm:p-5" key={metric.label}>
+              <article className="min-w-0 rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm sm:p-5" key={metric.label}>
                 <div className="flex items-center gap-2"><span className={`size-2 rounded-full ${metric.tone}`} /><p className="text-[11px] font-medium text-zinc-500 sm:text-xs">{metric.label}</p></div>
                 <p className="mt-4 text-2xl font-semibold tracking-tight sm:text-3xl">{metric.value}</p>
                 <p className="mt-2 truncate text-[10px] text-zinc-400 sm:text-xs">{metric.detail}</p>
@@ -91,7 +91,7 @@ export default async function DashboardPage() {
           </section>
 
           <section className="mt-4 grid gap-4 lg:grid-cols-[1.25fr_0.75fr]">
-            <article className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm sm:p-6">
+            <article className="min-w-0 rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm sm:p-6">
               <div className="flex items-center justify-between gap-4"><div><h3 className="text-sm font-semibold">Projects</h3><p className="mt-1 text-xs text-zinc-400">Recently updated work</p></div><Link className="text-xs font-medium text-zinc-400 transition hover:text-zinc-700" href="/dashboard/projects">View all</Link></div>
               {projects.length ? (
                 <div className="mt-5 divide-y divide-zinc-100">
@@ -107,13 +107,13 @@ export default async function DashboardPage() {
               )}
             </article>
 
-            <article className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm sm:p-6">
+            <article className="min-w-0 rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm sm:p-6">
               <div className="flex items-center justify-between gap-4"><div><h3 className="text-sm font-semibold">Upcoming</h3><p className="mt-1 text-xs text-zinc-400">Nearest task deadlines</p></div><Link className="text-xs font-medium text-zinc-400 transition hover:text-zinc-700" href="/dashboard/calendar">Calendar</Link></div>
               {upcomingTasks.length ? <div className="mt-5 divide-y divide-zinc-100">{upcomingTasks.map((task) => <Link className="flex items-center gap-3 py-3.5" href={`/dashboard/projects/${task.projectId}/tasks/${task.id}`} key={task.id}><span className="size-2 shrink-0 rounded-full bg-blue-500" /><span className="min-w-0 flex-1"><span className="block truncate text-xs font-medium text-zinc-700">{task.title}</span><span className="mt-1 block truncate text-[10px] text-zinc-400">{task.project.key}-{task.number} · {task.assignee ? personName(task.assignee.user) : "Unassigned"}</span></span><time className="shrink-0 text-[10px] font-medium text-zinc-500">{task.dueDate ? formatDueDate(task.dueDate) : ""}</time></Link>)}</div> : <div className="grid min-h-64 place-items-center px-5 text-center"><div><span className="mx-auto grid size-10 place-items-center rounded-full bg-zinc-100 text-zinc-400">✓</span><p className="mt-4 text-sm font-medium">No upcoming deadlines</p><p className="mt-1 text-xs text-zinc-400">Tasks with due dates will appear here.</p></div></div>}
             </article>
           </section>
 
-          <section className="mt-4 rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm sm:p-6">
+          <section className="mt-4 min-w-0 rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm sm:p-6">
             <div><h3 className="text-sm font-semibold">Recent activity</h3><p className="mt-1 text-xs text-zinc-400">Latest task updates across your workspace</p></div>
             {recentActivities.length ? <ol className="mt-6 grid gap-x-8 gap-y-5 md:grid-cols-2">{recentActivities.map((activity) => <li className="relative pl-5 text-xs before:absolute before:left-0 before:top-1.5 before:size-2 before:rounded-full before:bg-zinc-300" key={activity.id}><Link className="block" href={`/dashboard/projects/${activity.task.projectId}/tasks/${activity.task.id}`}><p className="leading-5 text-zinc-600"><span className="font-medium text-zinc-800">{personName(activity.actor)}</span> {activity.message} <span className="font-medium text-zinc-700">{activity.task.project.key}-{activity.task.number}</span></p><p className="mt-1 truncate text-[10px] text-zinc-400">{activity.task.title} · {formatDateTime(activity.createdAt)}</p></Link></li>)}</ol> : <div className="grid min-h-32 place-items-center text-center text-xs text-zinc-400">Task changes and comments will appear here.</div>}
           </section>
