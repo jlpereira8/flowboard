@@ -23,6 +23,22 @@ const commentSchema = z.object({
   body: z.string().trim().min(1, "Write a comment first.").max(2000, "Use 2,000 characters or fewer."),
 });
 
+const labelColorSchema = z.enum(["ZINC", "BLUE", "EMERALD", "AMBER", "RED", "VIOLET"]);
+
+const createLabelSchema = z.object({
+  projectId: z.string().min(1),
+  taskId: z.string().min(1),
+  name: z.string().trim().min(2, "Use at least 2 characters.").max(24, "Use 24 characters or fewer."),
+  color: labelColorSchema,
+});
+
+const updateLabelSchema = z.object({
+  projectId: z.string().min(1),
+  taskId: z.string().min(1),
+  labelId: z.string().min(1),
+  operation: z.enum(["add", "remove"]),
+});
+
 export type TaskDetailsState = {
   error?: string;
   success?: boolean;
@@ -42,6 +58,12 @@ export type CommentState = {
   fieldErrors?: { body?: string };
 };
 
+export type LabelState = {
+  error?: string;
+  success?: boolean;
+  fieldErrors?: { name?: string; color?: string };
+};
+
 const statusLabel = { TODO: "Todo", IN_PROGRESS: "In progress", REVIEW: "Review", DONE: "Done" } as const;
 const priorityLabel = { LOW: "Low", MEDIUM: "Medium", HIGH: "High", URGENT: "Urgent" } as const;
 
@@ -49,7 +71,15 @@ function refreshTask(projectId: string, taskId: string) {
   revalidatePath(`/dashboard/projects/${projectId}/tasks/${taskId}`);
   revalidatePath(`/dashboard/projects/${projectId}`);
   revalidatePath("/dashboard/tasks");
+  revalidatePath("/dashboard/calendar");
   revalidatePath("/dashboard");
+}
+
+async function findWorkspaceTask(workspaceId: string, projectId: string, taskId: string) {
+  return prisma.task.findFirst({
+    where: { id: taskId, projectId, project: { workspaceId } },
+    select: { id: true },
+  });
 }
 
 export async function updateTaskDetails(_state: TaskDetailsState, formData: FormData): Promise<TaskDetailsState> {
@@ -185,6 +215,102 @@ export async function addTaskComment(_state: CommentState, formData: FormData): 
     ]);
   } catch {
     return { error: "We could not add the comment. Try again." };
+  }
+
+  refreshTask(parsed.data.projectId, task.id);
+  return { success: true };
+}
+
+export async function createTaskLabel(_state: LabelState, formData: FormData): Promise<LabelState> {
+  const [{ userId }, membership] = await Promise.all([verifySession(), getCurrentWorkspace()]);
+  if (!membership) return { error: "Workspace not found." };
+  if (membership.role !== "OWNER" && membership.role !== "ADMIN") {
+    return { error: "Only workspace owners and admins can create labels." };
+  }
+
+  const parsed = createLabelSchema.safeParse({
+    projectId: formData.get("projectId"),
+    taskId: formData.get("taskId"),
+    name: formData.get("name"),
+    color: formData.get("color"),
+  });
+  if (!parsed.success) {
+    const fields = parsed.error.flatten().fieldErrors;
+    return { fieldErrors: { name: fields.name?.[0], color: fields.color?.[0] } };
+  }
+
+  const task = await findWorkspaceTask(membership.workspace.id, parsed.data.projectId, parsed.data.taskId);
+  if (!task) return { error: "Task not found." };
+
+  const existing = await prisma.taskLabel.findFirst({
+    where: { workspaceId: membership.workspace.id, name: { equals: parsed.data.name, mode: "insensitive" } },
+    select: { id: true },
+  });
+  if (existing) return { fieldErrors: { name: "A label with this name already exists." } };
+
+  try {
+    await prisma.$transaction(async (tx) => {
+      const label = await tx.taskLabel.create({
+        data: { name: parsed.data.name, color: parsed.data.color, workspaceId: membership.workspace.id },
+      });
+      await tx.taskLabelAssignment.create({ data: { taskId: task.id, labelId: label.id } });
+      await tx.taskActivity.create({
+        data: { type: "UPDATED", message: `created and added the ${label.name} label`, taskId: task.id, actorId: userId },
+      });
+    });
+  } catch {
+    return { error: "We could not create the label. Try another name." };
+  }
+
+  refreshTask(parsed.data.projectId, task.id);
+  return { success: true };
+}
+
+export async function updateTaskLabel(_state: LabelState, formData: FormData): Promise<LabelState> {
+  const [{ userId }, membership] = await Promise.all([verifySession(), getCurrentWorkspace()]);
+  if (!membership) return { error: "Workspace not found." };
+
+  const parsed = updateLabelSchema.safeParse({
+    projectId: formData.get("projectId"),
+    taskId: formData.get("taskId"),
+    labelId: formData.get("labelId"),
+    operation: formData.get("operation"),
+  });
+  if (!parsed.success) return { error: "Invalid label request." };
+
+  const [task, label] = await Promise.all([
+    findWorkspaceTask(membership.workspace.id, parsed.data.projectId, parsed.data.taskId),
+    prisma.taskLabel.findFirst({
+      where: { id: parsed.data.labelId, workspaceId: membership.workspace.id },
+      select: { id: true, name: true },
+    }),
+  ]);
+  if (!task || !label) return { error: "Task or label not found." };
+
+  try {
+    await prisma.$transaction(async (tx) => {
+      if (parsed.data.operation === "add") {
+        const existing = await tx.taskLabelAssignment.findUnique({
+          where: { taskId_labelId: { taskId: task.id, labelId: label.id } },
+          select: { taskId: true },
+        });
+        if (existing) return;
+        await tx.taskLabelAssignment.create({ data: { taskId: task.id, labelId: label.id } });
+        await tx.taskActivity.create({
+          data: { type: "UPDATED", message: `added the ${label.name} label`, taskId: task.id, actorId: userId },
+        });
+        return;
+      }
+
+      const removed = await tx.taskLabelAssignment.deleteMany({ where: { taskId: task.id, labelId: label.id } });
+      if (removed.count) {
+        await tx.taskActivity.create({
+          data: { type: "UPDATED", message: `removed the ${label.name} label`, taskId: task.id, actorId: userId },
+        });
+      }
+    });
+  } catch {
+    return { error: "We could not update the label. Try again." };
   }
 
   refreshTask(parsed.data.projectId, task.id);

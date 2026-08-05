@@ -29,6 +29,10 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
             priority: true,
             position: true,
             assignee: { select: { user: { select: { name: true, email: true } } } },
+            labels: {
+              orderBy: { createdAt: "asc" },
+              select: { label: { select: { id: true, name: true, color: true } } },
+            },
           },
         },
       },
@@ -72,7 +76,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
             </article>
           </section>
 
-          <KanbanBoard initialTasks={project.tasks} key={project.tasks.map((task) => `${task.id}:${task.status}:${task.position}`).join("|")} projectId={project.id} projectKey={project.key} />
+          <KanbanBoard initialTasks={project.tasks.map((task) => ({ ...task, labels: task.labels.map(({ label }) => label) }))} key={project.tasks.map((task) => `${task.id}:${task.status}:${task.position}`).join("|")} projectId={project.id} projectKey={project.key} />
         </div>
       </main>
     </AppShell>

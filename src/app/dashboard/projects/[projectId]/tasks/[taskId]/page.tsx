@@ -6,6 +6,7 @@ import { getCurrentWorkspace, verifySession } from "@/lib/dal";
 import { prisma } from "@/lib/prisma";
 
 import { CommentForm } from "./comment-form";
+import { LabelManager } from "./label-manager";
 import { TaskDetailsForm } from "./task-details-form";
 
 function personName(person: { name: string | null; email: string | null }) {
@@ -37,7 +38,7 @@ export default async function TaskPage({ params }: { params: Promise<{ projectId
   const [{ projectId, taskId }, { user }, membership] = await Promise.all([params, verifySession(), getCurrentWorkspace()]);
   if (!membership) redirect("/onboarding");
 
-  const [task, members] = await Promise.all([
+  const [task, members, workspaceLabels] = await Promise.all([
     prisma.task.findFirst({
       where: { id: taskId, projectId, project: { workspaceId: membership.workspace.id } },
       include: {
@@ -52,12 +53,21 @@ export default async function TaskPage({ params }: { params: Promise<{ projectId
           orderBy: { createdAt: "desc" },
           include: { actor: { select: { name: true, email: true } } },
         },
+        labels: {
+          orderBy: { createdAt: "asc" },
+          include: { label: { select: { id: true, name: true, color: true } } },
+        },
       },
     }),
     prisma.member.findMany({
       where: { workspaceId: membership.workspace.id },
       orderBy: { createdAt: "asc" },
       select: { id: true, user: { select: { name: true, email: true } } },
+    }),
+    prisma.taskLabel.findMany({
+      where: { workspaceId: membership.workspace.id },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true, color: true },
     }),
   ]);
 
@@ -105,6 +115,14 @@ export default async function TaskPage({ params }: { params: Promise<{ projectId
                   <div><dt className="text-zinc-400">Created</dt><dd className="mt-1.5 font-medium text-zinc-700">{formatDate(task.createdAt)}</dd></div>
                 </dl>
               </section>
+
+              <LabelManager
+                assigned={task.labels.map(({ label }) => label)}
+                available={workspaceLabels}
+                canCreate={membership.role === "OWNER" || membership.role === "ADMIN"}
+                projectId={task.projectId}
+                taskId={task.id}
+              />
 
               <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
                 <div className="flex items-center justify-between"><h3 className="text-sm font-semibold">Activity</h3><span className="text-[11px] text-zinc-400">{task.activities.length}</span></div>

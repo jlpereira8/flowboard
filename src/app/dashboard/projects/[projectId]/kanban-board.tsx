@@ -6,6 +6,8 @@ import { CSS } from "@dnd-kit/utilities";
 import Link from "next/link";
 import { useState, useTransition } from "react";
 
+import { TaskLabelPill, type TaskLabelColor } from "@/components/tasks/task-label";
+
 import { updateTaskBoard } from "./task-actions";
 
 const columns = [
@@ -25,6 +27,7 @@ type TaskCard = {
   priority: "LOW" | "MEDIUM" | "HIGH" | "URGENT";
   position: number;
   assignee: { user: { name: string | null; email: string | null } } | null;
+  labels: Array<{ id: string; name: string; color: TaskLabelColor }>;
 };
 
 const priorityStyle = {
@@ -55,6 +58,7 @@ function SortableTask({ projectId, projectKey, task, onStep }: { projectId: stri
       <Link className="group block" href={`/dashboard/projects/${projectId}/tasks/${task.id}`}>
         <h4 className="mt-2 text-sm font-medium leading-5 text-zinc-800">{task.title}</h4>
         {task.description ? <p className="mt-1.5 line-clamp-2 text-[11px] leading-4 text-zinc-400">{task.description}</p> : null}
+        {task.labels.length ? <div className="mt-2 flex flex-wrap gap-1">{task.labels.slice(0, 2).map((label) => <TaskLabelPill color={label.color} key={label.id} name={label.name} />)}{task.labels.length > 2 ? <span className="self-center text-[9px] text-zinc-400">+{task.labels.length - 2}</span> : null}</div> : null}
         <span className="mt-2 block text-[10px] font-medium text-zinc-300 transition group-hover:text-zinc-500">Open task →</span>
       </Link>
       <div className="mt-3 flex items-center justify-between border-t border-zinc-100 pt-2.5">
