@@ -1,5 +1,6 @@
 "use server";
 
+import { del } from "@vercel/blob";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
@@ -39,6 +40,12 @@ const updateLabelSchema = z.object({
   operation: z.enum(["add", "remove"]),
 });
 
+const deleteAttachmentSchema = z.object({
+  projectId: z.string().min(1),
+  taskId: z.string().min(1),
+  attachmentId: z.string().min(1),
+});
+
 export type TaskDetailsState = {
   error?: string;
   success?: boolean;
@@ -62,6 +69,11 @@ export type LabelState = {
   error?: string;
   success?: boolean;
   fieldErrors?: { name?: string; color?: string };
+};
+
+export type AttachmentState = {
+  error?: string;
+  success?: boolean;
 };
 
 const statusLabel = { TODO: "Todo", IN_PROGRESS: "In progress", REVIEW: "Review", DONE: "Done" } as const;
@@ -314,5 +326,45 @@ export async function updateTaskLabel(_state: LabelState, formData: FormData): P
   }
 
   refreshTask(parsed.data.projectId, task.id);
+  return { success: true };
+}
+
+export async function deleteTaskAttachment(_state: AttachmentState, formData: FormData): Promise<AttachmentState> {
+  const [{ userId }, membership] = await Promise.all([verifySession(), getCurrentWorkspace()]);
+  if (!membership) return { error: "Workspace not found." };
+
+  const parsed = deleteAttachmentSchema.safeParse({
+    projectId: formData.get("projectId"),
+    taskId: formData.get("taskId"),
+    attachmentId: formData.get("attachmentId"),
+  });
+  if (!parsed.success) return { error: "Invalid attachment request." };
+
+  const attachment = await prisma.taskAttachment.findFirst({
+    where: {
+      id: parsed.data.attachmentId,
+      taskId: parsed.data.taskId,
+      task: { projectId: parsed.data.projectId, project: { workspaceId: membership.workspace.id } },
+    },
+    select: { id: true, name: true, pathname: true, uploadedById: true },
+  });
+  if (!attachment) return { error: "Attachment not found." };
+
+  const canDelete = attachment.uploadedById === userId || membership.role === "OWNER" || membership.role === "ADMIN";
+  if (!canDelete) return { error: "You do not have permission to remove this attachment." };
+
+  try {
+    await del(attachment.pathname);
+    await prisma.$transaction([
+      prisma.taskAttachment.delete({ where: { id: attachment.id } }),
+      prisma.taskActivity.create({
+        data: { type: "UPDATED", message: `removed attachment ${attachment.name}`, taskId: parsed.data.taskId, actorId: userId },
+      }),
+    ]);
+  } catch {
+    return { error: "We could not remove the attachment. Try again." };
+  }
+
+  refreshTask(parsed.data.projectId, parsed.data.taskId);
   return { success: true };
 }
