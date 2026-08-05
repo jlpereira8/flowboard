@@ -61,6 +61,12 @@ enum NotificationType {
   STATUS_CHANGED
 }
 
+enum ThemePreference {
+  SYSTEM
+  LIGHT
+  DARK
+}
+
 model User {
   id                  String                @id @default(cuid())
   name                String?
@@ -164,16 +170,20 @@ model Project {
 }
 
 model Member {
-  id            String        @id @default(cuid())
-  role          WorkspaceRole @default(MEMBER)
-  userId        String
-  workspaceId   String
-  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  workspace     Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  teams         TeamMember[]
-  assignedTasks Task[]
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  id                  String          @id @default(cuid())
+  role                WorkspaceRole   @default(MEMBER)
+  notifyTaskAssigned  Boolean         @default(true)
+  notifyComments      Boolean         @default(true)
+  notifyStatusChanges Boolean         @default(true)
+  theme               ThemePreference @default(SYSTEM)
+  userId              String
+  workspaceId         String
+  user                User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace           Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  teams               TeamMember[]
+  assignedTasks       Task[]
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
 
   @@unique([userId, workspaceId])
   @@index([workspaceId])

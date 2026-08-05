@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { getCurrentWorkspace, verifySession } from "@/lib/dal";
-import { buildTaskNotifications, taskHref } from "@/lib/notifications";
+import { buildTaskNotifications, eligibleNotificationRecipients, taskHref } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
 
 const taskDetailsSchema = z.object({
@@ -167,6 +167,21 @@ export async function updateTaskDetails(_state: TaskDetailsState, formData: Form
   if (priorityChanged) activities.push({ type: "UPDATED", message: `changed priority from ${priorityLabel[task.priority]} to ${priorityLabel[parsed.data.priority]}` });
   if (statusChanged) activities.push({ type: "STATUS_CHANGED", message: `moved the task from ${statusLabel[task.status]} to ${statusLabel[parsed.data.status]}` });
 
+  const [assignmentRecipients, statusRecipients] = await Promise.all([
+    task.assigneeId !== (parsed.data.assigneeId || null) ? eligibleNotificationRecipients({
+      type: "TASK_ASSIGNED",
+      candidateIds: [nextAssigneeUserId],
+      actorId: userId,
+      workspaceId: membership.workspace.id,
+    }) : [],
+    statusChanged ? eligibleNotificationRecipients({
+      type: "STATUS_CHANGED",
+      candidateIds: [nextAssigneeUserId, task.createdById],
+      actorId: userId,
+      workspaceId: membership.workspace.id,
+    }) : [],
+  ]);
+
   try {
     await prisma.$transaction(async (tx) => {
       let position = undefined;
@@ -199,22 +214,22 @@ export async function updateTaskDetails(_state: TaskDetailsState, formData: Form
       }
 
       const notifications = [
-        ...(task.assigneeId !== (parsed.data.assigneeId || null) && nextAssigneeUserId ? buildTaskNotifications({
+        ...(assignmentRecipients.length ? buildTaskNotifications({
           type: "TASK_ASSIGNED",
           title: `${task.project.key}-${task.number} assigned to you`,
           message: `assigned you “${parsed.data.title}”`,
           href: taskHref(parsed.data.projectId, task.id),
-          recipientIds: [nextAssigneeUserId],
+          recipientIds: assignmentRecipients,
           actorId: userId,
           workspaceId: membership.workspace.id,
           taskId: task.id,
         }) : []),
-        ...(statusChanged ? buildTaskNotifications({
+        ...(statusRecipients.length ? buildTaskNotifications({
           type: "STATUS_CHANGED",
           title: `${task.project.key}-${task.number} moved to ${statusLabel[parsed.data.status]}`,
           message: `moved “${parsed.data.title}” from ${statusLabel[task.status]} to ${statusLabel[parsed.data.status]}`,
           href: taskHref(parsed.data.projectId, task.id),
-          recipientIds: [nextAssigneeUserId, task.createdById],
+          recipientIds: statusRecipients,
           actorId: userId,
           workspaceId: membership.workspace.id,
           taskId: task.id,
@@ -259,12 +274,18 @@ export async function addTaskComment(_state: CommentState, formData: FormData): 
   if (!task) return { error: "Task not found." };
 
   try {
+    const commentRecipients = await eligibleNotificationRecipients({
+      type: "COMMENT_ADDED",
+      candidateIds: [task.assignee?.userId, task.createdById],
+      actorId: userId,
+      workspaceId: membership.workspace.id,
+    });
     const notifications = buildTaskNotifications({
       type: "COMMENT_ADDED",
       title: `New comment on ${task.project.key}-${task.number}`,
       message: `commented on “${task.title}”`,
       href: taskHref(parsed.data.projectId, task.id),
-      recipientIds: [task.assignee?.userId, task.createdById],
+      recipientIds: commentRecipients,
       actorId: userId,
       workspaceId: membership.workspace.id,
       taskId: task.id,

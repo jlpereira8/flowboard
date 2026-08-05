@@ -6,7 +6,7 @@ import { prisma } from "@/lib/prisma";
 
 type AppShellProps = {
   children: React.ReactNode;
-  activeItem?: "overview" | "projects" | "teams" | "members" | "tasks" | "notifications" | "calendar";
+  activeItem?: "overview" | "projects" | "teams" | "members" | "tasks" | "notifications" | "calendar" | "settings";
   action?: { label: string; href: string } | null;
   title?: string;
   user: {
@@ -27,6 +27,7 @@ const navigation = [
   { id: "tasks", label: "My tasks", href: "/dashboard/tasks" },
   { id: "notifications", label: "Notifications", href: "/dashboard/notifications" },
   { id: "calendar", label: "Calendar", href: "/dashboard/calendar" },
+  { id: "settings", label: "Settings", href: "/dashboard/settings" },
 ] as const;
 
 export async function AppShell({ activeItem = "overview", action, children, title = "Overview", user, workspace }: AppShellProps) {
@@ -43,7 +44,7 @@ export async function AppShell({ activeItem = "overview", action, children, titl
     .join("");
 
   return (
-    <div className="min-h-screen bg-[#f7f7f5] text-zinc-950 lg:grid lg:grid-cols-[240px_1fr]">
+    <div className="min-h-screen bg-[#f7f7f5] text-zinc-950 lg:grid lg:grid-cols-[240px_1fr]" data-theme={membership?.theme.toLowerCase() || "system"}>
       <aside className="hidden border-r border-zinc-200 bg-white lg:flex lg:min-h-screen lg:flex-col">
         <div className="flex h-16 items-center gap-2.5 border-b border-zinc-100 px-5 font-semibold tracking-tight">
           <span className="grid size-8 place-items-center rounded-lg bg-zinc-950 text-sm text-white">F</span>

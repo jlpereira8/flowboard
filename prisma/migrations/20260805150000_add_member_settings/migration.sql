@@ -1,0 +1,7 @@
+CREATE TYPE "ThemePreference" AS ENUM ('SYSTEM', 'LIGHT', 'DARK');
+
+ALTER TABLE "Member"
+ADD COLUMN "notifyTaskAssigned" BOOLEAN NOT NULL DEFAULT true,
+ADD COLUMN "notifyComments" BOOLEAN NOT NULL DEFAULT true,
+ADD COLUMN "notifyStatusChanges" BOOLEAN NOT NULL DEFAULT true,
+ADD COLUMN "theme" "ThemePreference" NOT NULL DEFAULT 'SYSTEM';
